@@ -6,3 +6,5 @@ This repository contains code (that I mostly didn't write myself) to load and pr
 motion_tutorials contains example snippets of code to do various things.
 
 Example BVH file from http://mocap.cs.cmu.edu/resources.php
+
+:warning: **Must be used with matplotlib 3.3**, newer versions of matplotlib might break the plot_script functions
