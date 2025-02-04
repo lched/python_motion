@@ -33,9 +33,8 @@ def aa2quat(rots, form="wxyz", unified_orient=True):
     :return:
     """
     angles = rots.norm(dim=-1, keepdim=True)
-    norm = angles.clone()
-    norm[norm < 1e-8] = 1
-    axis = rots / norm
+    axis = rots / (angles + 1e-8)
+    angles[angles < 1e-6] = 0
     quats = torch.empty(rots.shape[:-1] + (4,), device=rots.device, dtype=rots.dtype)
     angles = angles * 0.5
     if form == "wxyz":
@@ -63,8 +62,9 @@ def quat2aa(quats):
     _sin = xyz.norm(dim=-1)
     norm = _sin.clone()
     norm[norm < 1e-7] = 1
-    axis = xyz / norm.unsqueeze(-1)
     angle = torch.atan2(_sin, _cos) * 2
+    angle[norm < 1e-7] = 0
+    axis = xyz / norm.unsqueeze(-1)
     return axis * angle.unsqueeze(-1)
 
 
