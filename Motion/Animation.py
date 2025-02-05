@@ -40,7 +40,7 @@ class Animation:
         parents   : (J) ndarray        | Joint Parents
     """
 
-    def __init__(self, rotations, positions, orients, offsets, parents):
+    def __init__(self, rotations, positions, offsets, parents, orients=None):
         self.rotations = rotations
         self.positions = positions
         if orients is None:
@@ -50,6 +50,11 @@ class Animation:
         self.orients = orients
         self.offsets = offsets
         self.parents = parents
+        if orients is None:
+            orients = Quaternions(
+                np.array([[1, 0, 0, 0] for _ in range(rotations.shape[-1])])
+            )
+        self.orients = orients
 
     def __op__(self, op, other):
         return Animation(
