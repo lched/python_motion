@@ -31,7 +31,9 @@ ordermap = {
 }
 
 
-def load(filename, start=None, end=None, order=None, world=True):
+def load(
+    filename, start=None, end=None, order=None, world=True, ignore_leaf_bones=False
+):
     """
     Reads a BVH file and constructs an animation
 
@@ -55,6 +57,8 @@ def load(filename, start=None, end=None, order=None, world=True):
         together in world space rather than local
         space
 
+    ignore_leaf_bones : bool
+        If set to true, exclude leaf bones (end sites) from the animation
     Returns
     -------
 
@@ -149,6 +153,8 @@ def load(filename, start=None, end=None, order=None, world=True):
 
         if "End Site" in line:
             end_site = True
+            if ignore_leaf_bones:
+                continue
             offsets = np.append(offsets, np.array([[0, 0, 0]]), axis=0)
             orients.qs = np.append(orients.qs, np.array([[1, 0, 0, 0]]), axis=0)
             parents = np.append(parents, active)
@@ -223,7 +229,7 @@ def load(filename, start=None, end=None, order=None, world=True):
 def save(
     filename: str,
     anim: Animation,
-    names= None,
+    names=None,
     frametime=1.0 / 24.0,
     order="xyz",
     positions=False,
