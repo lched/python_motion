@@ -4,12 +4,14 @@ import pickle
 
 import numpy as np
 import smplx
-import torch
 
-from .Animation import Animation
-from .Quaternions import Quaternions
+# import torch
+
+# from .Animation import Animation
+# from .Quaternions import Quaternions
 from .smpl_utils.utils import quat
-from .transforms import euler2mat, mat2quat
+
+# from .transforms import euler2mat, mat2quat
 
 SMPL_JOINTS_NAMES = [
     "Pelvis",
@@ -70,9 +72,12 @@ def load_smpl(smpl_file):
     return smpl_dict
 
 
-def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1/60):
+def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
     model = smplx.create(
-        model_path=Path(__file__).parent / "smpl_utils/data/smpl/", model_type="smpl", gender=gender, batch_size=1
+        model_path=Path(__file__).parent / "smpl_utils/data/smpl/",
+        model_type="smpl",
+        gender=gender,
+        batch_size=1,
     )
     parents = model.parents.detach().cpu().numpy()
 
@@ -139,7 +144,10 @@ def bvh_data_to_smpl(bvh_data, gender="NEUTRAL"):
 
     # Create SMPL model to get scaling factor
     model = smplx.create(
-        model_path=Path(__file__).parent / "smpl_utils/data/smpl/", model_type="smpl", gender=gender, batch_size=1
+        model_path=Path(__file__).parent / "smpl_utils/data/smpl/",
+        model_type="smpl",
+        gender=gender,
+        batch_size=1,
     )
     rest = model()
     rest_pose = rest.joints.detach().cpu().numpy().squeeze()[:24, :]

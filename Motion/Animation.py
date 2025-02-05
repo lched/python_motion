@@ -40,7 +40,7 @@ class Animation:
         parents   : (J) ndarray        | Joint Parents
     """
 
-    def __init__(self, rotations, positions, offsets, parents, orients=None):
+    def __init__(self, rotations, positions, orients, offsets, parents):
         self.rotations = rotations
         self.positions = positions
         if orients is None:
