@@ -64,7 +64,11 @@ def load_smpl(smpl_file):
             smpl_file = pickle.load(f)
             rots = smpl_file["smpl_poses"]  # (N, 72)
             rots = rots.reshape(rots.shape[0], -1, 3)  # (N, 24, 3)
-            scaling = smpl_file["smpl_scaling"]  # (1,)
+            if "smpl_scaling" in smpl_file.keys():
+                scaling = smpl_file["smpl_scaling"]  # (1,)
+            else:
+                scaling = (1,)
+                print("WARNING: No scaling found in the file, defaults to 1.")
             trans = smpl_file["smpl_trans"]  # (N, 3)
     else:
         raise ValueError("This file type is not supported!")
@@ -72,7 +76,7 @@ def load_smpl(smpl_file):
     return smpl_dict
 
 
-def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
+def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60, scale=1):
     model = smplx.create(
         model_path=Path(__file__).parent / "smpl_utils/data/smpl/",
         model_type="smpl",
@@ -87,26 +91,20 @@ def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
     root_offset = rest_pose[0]
     offsets = rest_pose - rest_pose[parents]
     offsets[0] = root_offset
-    offsets *= 100
+    offsets *= scale
 
     rots = smpl_dict["smpl_poses"]
     rots = rots.reshape(rots.shape[0], -1, 3)  # (N, 24, 3)
-    scaling = smpl_dict["smpl_scaling"]  # (1,)
-    trans = smpl_dict["smpl_trans"]  # (N, 3)
-
-    if scaling is not None:
-        trans /= scaling
+    positions = np.zeros_like(rots)
+    positions[:, 0] = smpl_dict["smpl_trans"]  # (N, 3)
 
     # to quaternion
     rots = quat.from_axis_angle(rots)
+    # print("quats shape:", quat.shape)
 
-    order = "zyx"
-    pos = offsets[None].repeat(len(rots), axis=0)
-    positions = pos.copy()
-    positions[:, 0] += trans * 100
+    order = "yzx"
     rotations = np.degrees(quat.to_euler(rots, order=order))
 
-    # This works!
     bvh_data = {
         "rotations": rotations,
         "positions": positions,
@@ -127,7 +125,7 @@ def bvh_data_to_smpl(bvh_data, gender="NEUTRAL"):
     order = "zyx"
 
     # Convert rotations from degrees to radians
-    rotations = np.radians(rotations)
+    rotations = np.radians(rotations)  # TODO: check that
 
     # Convert rotations from Euler angles to quaternions
     rots = quat.from_euler(rotations, order=order)

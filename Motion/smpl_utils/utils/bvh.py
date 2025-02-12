@@ -47,7 +47,6 @@ def load(filename: str, order: str = None) -> dict:
 
     # Parse the file, line by line
     for line in f:
-
         if "HIERARCHY" in line:
             continue
         if "MOTION" in line:
@@ -151,7 +150,6 @@ def load(filename: str, order: str = None) -> dict:
 
 
 def save_joint(f, data, t, i, save_order, order="zyx", save_positions=False):
-
     save_order.append(i)
 
     f.write("%sJOINT %s\n" % (t, data["names"][i]))
@@ -220,7 +218,6 @@ def save(filename, data, save_positions=False):
     frametime = data["frametime"]
 
     with open(filename, "w") as f:
-
         t = ""
         f.write("%sHIERARCHY\n" % t)
         f.write("%sROOT %s\n" % (t, data["names"][0]))
@@ -266,9 +263,7 @@ def save(filename, data, save_positions=False):
 
         for i in range(rots.shape[0]):
             for j in save_order:
-
                 if save_positions or j == 0:
-
                     f.write(
                         "%f %f %f %f %f %f "
                         % (
@@ -282,7 +277,5 @@ def save(filename, data, save_positions=False):
                     )
 
                 else:
-
                     f.write("%f %f %f " % (rots[i, j, 0], rots[i, j, 1], rots[i, j, 2]))
-
             f.write("\n")

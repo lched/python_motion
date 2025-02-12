@@ -116,7 +116,6 @@ def exp(x, eps=1e-5):
 
 # Calculate global space rotations and positions from local space.
 def fk(lrot, lpos, parents):
-
     gp, gr = [lpos[..., :1, :]], [lrot[..., :1, :]]
     for i in range(1, len(parents)):
         gp.append(mul_vec(gr[parents[i]], lpos[..., i : i + 1, :]) + gp[parents[i]])
@@ -126,7 +125,6 @@ def fk(lrot, lpos, parents):
 
 
 def fk_rot(lrot, parents):
-
     gr = [lrot[..., :1, :]]
     for i in range(1, len(parents)):
         gr.append(mul(gr[parents[i]], lrot[..., i : i + 1, :]))
@@ -136,7 +134,6 @@ def fk_rot(lrot, parents):
 
 # Calculate local space rotations and positions from global space.
 def ik(grot, gpos, parents):
-
     return (
         np.concatenate(
             [
@@ -159,7 +156,6 @@ def ik(grot, gpos, parents):
 
 
 def ik_rot(grot, parents):
-
     return np.concatenate(
         [
             grot[..., :1, :],
@@ -170,7 +166,6 @@ def ik_rot(grot, parents):
 
 
 def fk_vel(lrot, lpos, lvel, lang, parents):
-
     gp, gr, gv, ga = (
         [lpos[..., :1, :]],
         [lrot[..., :1, :]],
@@ -230,7 +225,12 @@ def slerp(x, y, t):
 
 
 # Calculate euler angles from quaternions.
+import numpy as np
+
+
 def to_euler(x, order="zyx"):
+    # Ensure the quaternions are normalized
+    x = x / np.linalg.norm(x, axis=-1, keepdims=True)
 
     q0 = x[..., 0:1]
     q1 = x[..., 1:2]
@@ -238,7 +238,6 @@ def to_euler(x, order="zyx"):
     q3 = x[..., 3:4]
 
     if order == "zyx":
-
         return np.concatenate(
             [
                 np.arctan2(2 * (q0 * q3 + q1 * q2), 1 - 2 * (q2 * q2 + q3 * q3)),
@@ -249,7 +248,6 @@ def to_euler(x, order="zyx"):
         )
 
     elif order == "yzx":
-
         return np.concatenate(
             [
                 np.arctan2(
@@ -264,7 +262,6 @@ def to_euler(x, order="zyx"):
         )
 
     elif order == "zxy":
-
         return np.concatenate(
             [
                 np.arctan2(
@@ -279,7 +276,6 @@ def to_euler(x, order="zyx"):
         )
 
     elif order == "yxz":
-
         return np.concatenate(
             [
                 np.arctan2(
@@ -299,7 +295,6 @@ def to_euler(x, order="zyx"):
 
 # Calculate rotation matrix from quaternions.
 def to_xform(x):
-
     qw, qx, qy, qz = x[..., 0:1], x[..., 1:2], x[..., 2:3], x[..., 3:4]
 
     x2, y2, z2 = qx + qx, qy + qy, qz + qz
@@ -320,7 +315,6 @@ def to_xform(x):
 # Calculate 6d orthogonal rotation representation (ortho6d) from quaternions.
 # https://github.com/papagina/RotationContinuity
 def to_xform_xy(x):
-
     qw, qx, qy, qz = x[..., 0:1], x[..., 1:2], x[..., 2:3], x[..., 3:4]
 
     x2, y2, z2 = qx + qx, qy + qy, qz + qz
@@ -380,7 +374,6 @@ def from_euler(e, order="zyx"):
 
 # Calculate quaternions from rotation matrix.
 def from_xform(ts):
-
     return normalize(
         np.where(
             (ts[..., 2, 2] < 0.0)[..., None],
@@ -440,7 +433,6 @@ def from_xform(ts):
 
 # Calculate quaternions from ortho6d.
 def from_xform_xy(x):
-
     c2 = _fast_cross(x[..., 0], x[..., 1])
     c2 = c2 / np.sqrt(np.sum(np.square(c2), axis=-1))[..., None]
     c1 = _fast_cross(c2, x[..., 0])
