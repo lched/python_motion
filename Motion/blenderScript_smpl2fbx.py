@@ -231,13 +231,16 @@ def add_animation(pkl_name, smpl_params, fps):
             fcurve = armature.animation_data.action.fcurves.new(
                 data_path, index=axis_idx
             )
-            for frame_idx in range(len(quats)):
-                fcurve.keyframe_points.insert(
-                    frame=frame_idx,
-                    value=quats[frame_idx, joint_idx, axis_idx],
-                    options={"FAST"},
-                )
+            frames = np.arange(quats.shape[0])  # Frame indices
+            samples = quats[:, joint_idx, axis_idx]  # Values for this axis
+            # Add keyframes
+            fcurve.keyframe_points.add(count=len(frames))
+            fcurve.keyframe_points.foreach_set(
+                "co", [x for co in zip(frames, samples) for x in co]
+            )
+            fcurve.update()
 
+    # Translation
     bone = armature.pose.bones.get(joints[0])
     if bone:
         smpl_trans = smpl_params["smpl_trans"]
@@ -246,12 +249,14 @@ def add_animation(pkl_name, smpl_params, fps):
             fcurve = armature.animation_data.action.fcurves.new(
                 data_path, index=axis_idx
             )
-            for frame_idx in range(len(smpl_trans)):
-                fcurve.keyframe_points.insert(
-                    frame=frame_idx,
-                    value=smpl_trans[frame_idx, axis_idx],
-                    options={"FAST"},
-                )
+            frames = np.arange(smpl_trans.shape[0])  # Frame indices
+            samples = smpl_trans[:, axis_idx]  # Values for this axis
+            # Add keyframes
+            fcurve.keyframe_points.add(count=len(frames))
+            fcurve.keyframe_points.foreach_set(
+                "co", [x for co in zip(frames, samples) for x in co]
+            )
+            fcurve.update()
 
     output_path = f"{args.output_base}/{Path(pkl_name).stem}.fbx"
     bpy.ops.export_scene.fbx(filepath=output_path)
