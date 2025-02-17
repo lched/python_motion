@@ -67,8 +67,8 @@ def load_smpl(smpl_file):
             if "smpl_scaling" in smpl_file.keys():
                 scaling = smpl_file["smpl_scaling"]  # (1,)
             else:
-                scaling = (1,)
-                print("WARNING: No scaling found in the file, defaults to 1.")
+                scaling = (100,)
+                print("WARNING: No scaling found in the file, defaults to 100.")
             trans = smpl_file["smpl_trans"]  # (N, 3)
     else:
         raise ValueError("This file type is not supported!")
@@ -76,7 +76,7 @@ def load_smpl(smpl_file):
     return smpl_dict
 
 
-def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60, scale=1):
+def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
     model = smplx.create(
         model_path=Path(__file__).parent / "smpl_utils/data/smpl/",
         model_type="smpl",
@@ -91,7 +91,6 @@ def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60, scale=1):
     root_offset = rest_pose[0]
     offsets = rest_pose - rest_pose[parents]
     offsets[0] = root_offset
-    offsets *= scale
 
     rots = smpl_dict["smpl_poses"]
     rots = rots.reshape(rots.shape[0], -1, 3)  # (N, 24, 3)
@@ -100,10 +99,16 @@ def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60, scale=1):
 
     # to quaternion
     rots = quat.from_axis_angle(rots)
-    # print("quats shape:", quat.shape)
 
     order = "yzx"
     rotations = np.degrees(quat.to_euler(rots, order=order))
+
+    if "smpl_scaling" in smpl_dict.keys():
+        scaling = smpl_dict["smpl_scaling"]
+    else:
+        scaling = 100
+    offsets *= scaling
+    # positions *= scaling / 100
 
     bvh_data = {
         "rotations": rotations,
@@ -118,48 +123,33 @@ def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60, scale=1):
 
 
 def bvh_data_to_smpl(bvh_data, gender="NEUTRAL"):
+    # First, make sure the bvh_data is in the same order as SMPL format expects
+    # Create a mapping from the current names to the SMPL_JOINTS_NAMES
+    name_to_index = {name: i for i, name in enumerate(bvh_data["names"])}
+    # smpl_to_index = {name: i for i, name in enumerate(SMPL_JOINTS_NAMES)}
+    # Create a reordering index array
+    reorder_index = [name_to_index[name] for name in SMPL_JOINTS_NAMES]
+
     # Extract BVH data
-    rotations = bvh_data["rotations"]
-    positions = bvh_data["positions"]
-    offsets = bvh_data["offsets"]
-    order = "zyx"
+    rotations = bvh_data["rotations"][:, reorder_index, :]
+    positions = bvh_data["positions"][:, reorder_index, :]
 
-    # Convert rotations from degrees to radians
-    rotations = np.radians(rotations)  # TODO: check that
-
-    # Convert rotations from Euler angles to quaternions
-    rots = quat.from_euler(rotations, order=order)
-
-    # Convert quaternions to axis-angle representation
-    rots = quat.to_scaled_angle_axis(rots)
+    # Convert rotations
+    rotations = np.radians(rotations)
+    rotations = quat.from_euler(rotations, order=bvh_data["order"])
+    rotations = quat.to_axis_angle(rotations)
 
     # Reshape rotations to match SMPL format
-    rots = rots.reshape(rots.shape[0], -1)
+    rotations = rotations.reshape(rotations.shape[0], -1)
 
     # Extract root translation and scale it back
-    trans = positions[:, 0] - offsets[0][None]
-    trans /= 100
-
-    # Create SMPL model to get scaling factor
-    model = smplx.create(
-        model_path=Path(__file__).parent / "smpl_utils/data/smpl/",
-        model_type="smpl",
-        gender=gender,
-        batch_size=1,
-    )
-    rest = model()
-    rest_pose = rest.joints.detach().cpu().numpy().squeeze()[:24, :]
-    root_offset = rest_pose[0]
-    scaling = np.linalg.norm(root_offset) / np.linalg.norm(offsets[0])
-
-    # Scale translation back
-    trans *= scaling
+    trans = positions[:, 0]  # - offsets[0][None]
 
     # Prepare SMPL dictionary
     smpl_dict = {
-        "smpl_poses": rots,
+        "smpl_poses": rotations,
         "smpl_trans": trans,
-        "smpl_scaling": np.array([scaling]),
+        "smpl_scaling": np.array([100]),
     }
 
     return smpl_dict

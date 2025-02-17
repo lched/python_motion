@@ -332,9 +332,24 @@ def to_xform_xy(x):
     )
 
 
-# Calculate scaled angle axis from quaternions.
-def to_scaled_angle_axis(x, eps=1e-5):
-    return 2.0 * log(x, eps)
+def to_axis_angle(quaternion):
+    """Convert a quaternion (scalar-first convention) to axis-angle representation."""
+    quaternion = quaternion / np.linalg.norm(
+        quaternion, axis=-1, keepdims=True
+    )  # Normalize
+    w, xyz = quaternion[..., 0], quaternion[..., 1:]  # Extract scalar and vector parts
+
+    angle = 2 * np.arctan2(np.linalg.norm(xyz, axis=-1), w)  # Compute angle
+    sin_half_angle = np.linalg.norm(xyz, axis=-1)
+
+    # Avoid division by zero; set axis to default [1,0,0] if near zero rotation
+    axis = np.where(
+        sin_half_angle[..., None] > 1e-8,
+        xyz / sin_half_angle[..., None],
+        np.array([1.0, 0.0, 0.0]),
+    )
+
+    return axis * angle[..., None]  # Return axis-angle representation
 
 
 #############################################
@@ -442,8 +457,3 @@ def from_xform_xy(x):
     return from_xform(
         np.concatenate([c0[..., None], c1[..., None], c2[..., None]], axis=-1)
     )
-
-
-# Calculate quaternions from scaled angle axis.
-def from_scaled_angle_axis(x, eps=1e-5):
-    return exp(x / 2.0, eps)

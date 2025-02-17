@@ -205,7 +205,6 @@ def add_animation(pkl_name, smpl_params, fps):
     if armature.animation_data.action is None:
         armature.animation_data.action = bpy.data.actions.new("Action")
 
-    joints = SmplObjects.joints
     rotation = R.from_quat(np.array([-0.7071068, 0, 0, 0.7071068]))
     root_rotvec = smpl_params["smpl_poses"][:, 0:3]
     root_rotvec = (rotation * R.from_rotvec(root_rotvec)).as_rotvec()
@@ -219,6 +218,8 @@ def add_animation(pkl_name, smpl_params, fps):
     quats = from_axis_angle(
         smpl_params["smpl_poses"].reshape(smpl_params["smpl_poses"].shape[0], -1, 3)
     )
+
+    joints = SmplObjects.joints
     for joint_idx, name in enumerate(joints):
         bone = armature.pose.bones.get(name)
         if not bone:
