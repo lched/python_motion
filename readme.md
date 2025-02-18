@@ -13,5 +13,3 @@ smpl2bvh repository here: https://github.com/KosukeFukazawa/smpl2bvh
 SMPL models can't be distributed with this software because of SMPL license.
 
 :warning: This repository is still very much a work in progress (for example there are two bvh files/processing, how confusing right?). I'm just making it public if it can help someone.
-
-test_smpl.pkl is from AISTpp and uses their specification: up is along Z-axis.

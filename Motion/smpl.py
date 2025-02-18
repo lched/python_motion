@@ -84,36 +84,37 @@ def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
         batch_size=1,
     )
     parents = model.parents.detach().cpu().numpy()
-
     rest = model()
     rest_pose = rest.joints.detach().cpu().numpy().squeeze()[:24, :]
 
     root_offset = rest_pose[0]
     offsets = rest_pose - rest_pose[parents]
     offsets[0] = root_offset
-
-    rots = smpl_dict["smpl_poses"]
-    rots = rots.reshape(rots.shape[0], -1, 3)  # (N, 24, 3)
-    positions = np.zeros_like(rots)
-    positions[:, 0] = smpl_dict["smpl_trans"]  # (N, 3)
-
-    # to quaternion
-    rots = quat.from_axis_angle(rots)
-
-    order = "yzx"
-    rotations = np.degrees(quat.to_euler(rots, order=order))
+    offsets *= 100
 
     if "smpl_scaling" in smpl_dict.keys():
         scaling = smpl_dict["smpl_scaling"]
     else:
         scaling = 100
-    offsets *= scaling
-    # positions *= scaling / 100
+
+    rots = smpl_dict["smpl_poses"]
+    rots = rots.reshape(rots.shape[0], -1, 3)  # (N, 24, 3)
+    trans = smpl_dict["smpl_trans"]  # (N, 3)
+    trans /= scaling
+
+    # to quaternion
+    rots = quat.from_axis_angle(rots)
+    order = "yzx"
+
+    pos = offsets[None].repeat(len(rots), axis=0)
+    positions = pos.copy()
+    positions[:, 0] += trans * 100
+    rotations = np.degrees(quat.to_euler(rots, order=order))
 
     bvh_data = {
         "rotations": rotations,
-        "positions": positions,
-        "offsets": offsets,
+        "positions": positions / 100,  # We want the results in meter convention
+        "offsets": offsets / 100,
         "parents": parents,
         "names": SMPL_JOINTS_NAMES,
         "order": order,
