@@ -342,6 +342,7 @@ def to_axis_angle(quaternion):
     angle = 2 * np.arctan2(np.linalg.norm(xyz, axis=-1), w)  # Compute angle
     sin_half_angle = np.linalg.norm(xyz, axis=-1)
 
+    angle[angle == 0] = 1e-8
     # Avoid division by zero; set axis to default [1,0,0] if near zero rotation
     axis = np.where(
         sin_half_angle[..., None] > 1e-8,
