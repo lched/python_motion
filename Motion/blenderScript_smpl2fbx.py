@@ -198,6 +198,7 @@ def add_animation(pkl_name, smpl_params, fps):
     )
     if not armature:
         raise Exception("No armature found in the scene.")
+    armature.name = str(Path(pkl_name).stem)
 
     armature.animation_data_clear()
     if armature.animation_data is None:
