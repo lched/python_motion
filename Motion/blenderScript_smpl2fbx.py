@@ -182,16 +182,19 @@ def to_euler(x, order="zyx"):
         raise NotImplementedError("Cannot convert from ordering %s" % order)
 
 
-def add_animation(pkl_name, smpl_params, fps):
-    bpy.context.scene.render.fps = fps
+def add_animation(pkl_name, fbx_source_path, smpl_params, output_folder, fps, fix_offset):
     clear_scene()
 
     bpy.ops.import_scene.fbx(
-        filepath=args.fbx_source_path,
+        filepath=fbx_source_path,
         use_custom_props=True,
         use_custom_props_enum_as_string=True,
         ignore_leaf_bones=True,
     )
+    source_fps = bpy.context.scene.render.fps
+    bpy.context.scene.render.fps = fps
+    bpy.context.scene.render.frame_map_old = source_fps
+    bpy.context.scene.render.frame_map_new = fps
 
     armature = next(
         (obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"), None
@@ -215,6 +218,8 @@ def add_animation(pkl_name, smpl_params, fps):
     smpl_trans_y_up[..., 1] = smpl_params["smpl_trans"][..., 2]
     smpl_trans_y_up[..., 2] = -smpl_params["smpl_trans"][..., 1]
     smpl_params["smpl_trans"] = smpl_trans_y_up
+    if fix_offset:
+        smpl_params["smpl_trans"] -= [0, 0.9, 0]
 
     quats = from_axis_angle(
         smpl_params["smpl_poses"].reshape(smpl_params["smpl_poses"].shape[0], -1, 3)
@@ -260,7 +265,7 @@ def add_animation(pkl_name, smpl_params, fps):
             )
             fcurve.update()
 
-    output_path = f"{args.output_base}/{Path(pkl_name).stem}.fbx"
+    output_path = f"{output_folder}/{Path(pkl_name).stem}.fbx"
     bpy.ops.export_scene.fbx(filepath=output_path)
     print(f"Exported FBX to {output_path}")
 
@@ -269,15 +274,17 @@ if __name__ == "__main__":
     parser = ArgumentParserForBlender()
     parser.add_argument("--input_pkl_base", type=str, required=True)
     parser.add_argument("--fbx_source_path", type=str, required=True)
-    parser.add_argument("--output_base", type=str, required=True)
+    parser.add_argument("--output_base", type=str, default=None)
     parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--fix_offset", action="store_true")
     args = parser.parse_args()
 
-    Path(args.output_base).mkdir(exist_ok=True, parents=True)
+    output_folder = args.output_base if args.output_base else args.input_pkl_base
+    Path(output_folder).mkdir(exist_ok=True, parents=True)
     smpl_objects = SmplObjects(args.input_pkl_base)
 
     for pkl_name, smpl_params in smpl_objects:
         try:
-            add_animation(pkl_name, smpl_params, args.fps)
+            add_animation(pkl_name, args.fbx_source_path, smpl_params, output_folder, args.fps, args.fix_offset)
         except Exception as e:
             print(f"Error processing {pkl_name}: {e}")
