@@ -334,23 +334,37 @@ def to_xform_xy(x):
 
 def to_axis_angle(quaternion):
     """Convert a quaternion (scalar-first convention) to axis-angle representation."""
-    quaternion = quaternion / np.linalg.norm(
-        quaternion, axis=-1, keepdims=True
-    )  # Normalize
-    w, xyz = quaternion[..., 0], quaternion[..., 1:]  # Extract scalar and vector parts
+    # Normalize the quaternion
+    quaternion = quaternion / np.linalg.norm(quaternion, axis=-1, keepdims=True)
 
-    angle = 2 * np.arctan2(np.linalg.norm(xyz, axis=-1), w)  # Compute angle
+    # Extract scalar (w) and vector (xyz) parts
+    w, xyz = quaternion[..., 0], quaternion[..., 1:]
+
+    # Compute the angle
+    angle = 2 * np.arctan2(np.linalg.norm(xyz, axis=-1), w)
+
+    # Normalize the angle to the range [-π, π]
+    angle = (angle + np.pi) % (2 * np.pi) - np.pi
+
+    # Constrain the angle to [-π/2, π/2] by flipping the axis if necessary
+    mask = angle > np.pi / 2
+    xyz[mask] *= -1
+    angle[mask] -= np.pi
+
+    mask = angle < -np.pi / 2
+    xyz[mask] *= -1
+    angle[mask] += np.pi
+
+    # Compute the axis
     sin_half_angle = np.linalg.norm(xyz, axis=-1)
-
-    angle[angle == 0] = 1e-8
-    # Avoid division by zero; set axis to default [1,0,0] if near zero rotation
     axis = np.where(
         sin_half_angle[..., None] > 1e-8,
         xyz / sin_half_angle[..., None],
-        np.array([1.0, 0.0, 0.0]),
+        np.array([1.0, 0.0, 0.0]),  # Default axis for zero rotation
     )
 
-    return axis * angle[..., None]  # Return axis-angle representation
+    # Return axis-angle representation
+    return axis * angle[..., None]
 
 
 #############################################

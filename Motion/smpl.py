@@ -123,7 +123,7 @@ def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
     return bvh_data
 
 
-def bvh_data_to_smpl(bvh_data, gender="NEUTRAL"):
+def bvh_data_to_smpl(bvh_data):
     # First, make sure the bvh_data is in the same order as SMPL format expects
     # Create a mapping from the current names to the SMPL_JOINTS_NAMES
     name_to_index = {name: i for i, name in enumerate(bvh_data["names"])}
