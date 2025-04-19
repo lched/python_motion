@@ -113,7 +113,12 @@ def from_angle_axis(angle, axis):
 # Calculate quaternions from axis-angle.
 def from_axis_angle(rots):
     angle = np.linalg.norm(rots, axis=-1)
-    axis = rots / angle[..., None]
+    # Prevent division by zero
+    axis = np.where(
+        angle[..., None] > 0,
+        rots / angle[..., None],
+        np.array([1.0, 0.0, 0.0]),  # default axis when angle == 0
+    )
     return from_angle_axis(angle, axis)
 
 
@@ -182,7 +187,9 @@ def to_euler(x, order="zyx"):
         raise NotImplementedError("Cannot convert from ordering %s" % order)
 
 
-def add_animation(pkl_name, fbx_source_path, smpl_params, output_folder, fps, fix_offset):
+def add_animation(
+    pkl_name, fbx_source_path, smpl_params, output_folder, fps, fix_offset
+):
     clear_scene()
 
     bpy.ops.import_scene.fbx(
@@ -191,10 +198,7 @@ def add_animation(pkl_name, fbx_source_path, smpl_params, output_folder, fps, fi
         use_custom_props_enum_as_string=True,
         ignore_leaf_bones=True,
     )
-    source_fps = bpy.context.scene.render.fps
     bpy.context.scene.render.fps = fps
-    bpy.context.scene.render.frame_map_old = source_fps
-    bpy.context.scene.render.frame_map_new = fps
 
     armature = next(
         (obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"), None
@@ -209,17 +213,17 @@ def add_animation(pkl_name, fbx_source_path, smpl_params, output_folder, fps, fi
     if armature.animation_data.action is None:
         armature.animation_data.action = bpy.data.actions.new("Action")
 
-    rotation = R.from_quat(np.array([-0.7071068, 0, 0, 0.7071068]))
-    root_rotvec = smpl_params["smpl_poses"][:, 0:3]
-    root_rotvec = (rotation * R.from_rotvec(root_rotvec)).as_rotvec()
-    smpl_params["smpl_poses"][:, 0:3] = root_rotvec
+    # rotation = R.from_quat(np.array([-0.7071068, 0, 0, 0.7071068]))
+    # root_rotvec = smpl_params["smpl_poses"][:, 0:3]
+    # root_rotvec = (rotation * R.from_rotvec(root_rotvec)).as_rotvec()
+    # smpl_params["smpl_poses"][:, 0:3] = root_rotvec
 
-    smpl_trans_y_up = np.copy(smpl_params["smpl_trans"])
-    smpl_trans_y_up[..., 1] = smpl_params["smpl_trans"][..., 2]
-    smpl_trans_y_up[..., 2] = -smpl_params["smpl_trans"][..., 1]
-    smpl_params["smpl_trans"] = smpl_trans_y_up
-    if fix_offset:
-        smpl_params["smpl_trans"] -= [0, 0.9, 0]
+    # smpl_trans_y_up = np.copy(smpl_params["smpl_trans"])
+    # smpl_trans_y_up[..., 1] = smpl_params["smpl_trans"][..., 2]
+    # smpl_trans_y_up[..., 2] = -smpl_params["smpl_trans"][..., 1]
+    # smpl_params["smpl_trans"] = smpl_trans_y_up
+    # if fix_offset:
+    #     smpl_params["smpl_trans"] -= [0, 0.9, 0]
 
     quats = from_axis_angle(
         smpl_params["smpl_poses"].reshape(smpl_params["smpl_poses"].shape[0], -1, 3)
@@ -250,7 +254,7 @@ def add_animation(pkl_name, fbx_source_path, smpl_params, output_folder, fps, fi
     # Translation
     bone = armature.pose.bones.get(joints[0])
     if bone:
-        smpl_trans = smpl_params["smpl_trans"]
+        smpl_trans = smpl_params["smpl_trans"] / 100
         for axis_idx, axis in enumerate(["x", "y", "z"]):
             data_path = f'pose.bones["{joints[0]}"].location'
             fcurve = armature.animation_data.action.fcurves.new(
@@ -285,6 +289,13 @@ if __name__ == "__main__":
 
     for pkl_name, smpl_params in smpl_objects:
         try:
-            add_animation(pkl_name, args.fbx_source_path, smpl_params, output_folder, args.fps, args.fix_offset)
+            add_animation(
+                pkl_name,
+                args.fbx_source_path,
+                smpl_params,
+                output_folder,
+                args.fps,
+                args.fix_offset,
+            )
         except Exception as e:
             print(f"Error processing {pkl_name}: {e}")
