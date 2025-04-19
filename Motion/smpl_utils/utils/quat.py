@@ -383,8 +383,14 @@ def from_angle_axis(angle, axis):
 # Calculate quaternions from axis-angle.
 def from_axis_angle(rots):
     angle = np.linalg.norm(rots, axis=-1)
-    axis = rots / angle[..., None]
+    # Prevent division by zero
+    axis = np.where(
+        angle[..., None] > 0,
+        rots / angle[..., None],
+        np.array([1.0, 0.0, 0.0])  # default axis when angle == 0
+    )
     return from_angle_axis(angle, axis)
+
 
 
 # Calculate quaternions from euler angles.
