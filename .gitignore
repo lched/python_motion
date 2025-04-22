@@ -1,2 +1,5 @@
 __pycache__/
 Motion/smpl_utils/data/smpl/smpl/
+*.pkl
+*.gltf
+*.glb

@@ -187,17 +187,26 @@ def to_euler(x, order="zyx"):
         raise NotImplementedError("Cannot convert from ordering %s" % order)
 
 
-def add_animation(
-    pkl_name, fbx_source_path, smpl_params, output_folder, fps, fix_offset
+def convert_animation(
+    pkl_name, fbx_source_path, smpl_params, output_folder, fps, fix_edge_offset, z_up
 ):
     clear_scene()
 
-    bpy.ops.import_scene.fbx(
-        filepath=fbx_source_path,
-        use_custom_props=True,
-        use_custom_props_enum_as_string=True,
-        ignore_leaf_bones=True,
-    )
+    if z_up:
+        bpy.ops.import_scene.fbx(
+            filepath=fbx_source_path,
+            use_custom_props=True,
+            use_custom_props_enum_as_string=True,
+            ignore_leaf_bones=True,
+            axis_up="Z",
+        )
+    else:
+        bpy.ops.import_scene.fbx(
+            filepath=fbx_source_path,
+            use_custom_props=True,
+            use_custom_props_enum_as_string=True,
+            ignore_leaf_bones=True,
+        )
     bpy.context.scene.render.fps = fps
 
     armature = next(
@@ -212,18 +221,6 @@ def add_animation(
         armature.animation_data_create()
     if armature.animation_data.action is None:
         armature.animation_data.action = bpy.data.actions.new("Action")
-
-    # rotation = R.from_quat(np.array([-0.7071068, 0, 0, 0.7071068]))
-    # root_rotvec = smpl_params["smpl_poses"][:, 0:3]
-    # root_rotvec = (rotation * R.from_rotvec(root_rotvec)).as_rotvec()
-    # smpl_params["smpl_poses"][:, 0:3] = root_rotvec
-
-    # smpl_trans_y_up = np.copy(smpl_params["smpl_trans"])
-    # smpl_trans_y_up[..., 1] = smpl_params["smpl_trans"][..., 2]
-    # smpl_trans_y_up[..., 2] = -smpl_params["smpl_trans"][..., 1]
-    # smpl_params["smpl_trans"] = smpl_trans_y_up
-    # if fix_offset:
-    #     smpl_params["smpl_trans"] -= [0, 0.9, 0]
 
     quats = from_axis_angle(
         smpl_params["smpl_poses"].reshape(smpl_params["smpl_poses"].shape[0], -1, 3)
@@ -254,12 +251,13 @@ def add_animation(
     # Translation
     bone = armature.pose.bones.get(joints[0])
     if bone:
-        smpl_trans = smpl_params["smpl_trans"] / 100
+        smpl_trans = smpl_params["smpl_trans"]
         for axis_idx, axis in enumerate(["x", "y", "z"]):
             data_path = f'pose.bones["{joints[0]}"].location'
             fcurve = armature.animation_data.action.fcurves.new(
                 data_path, index=axis_idx
             )
+
             frames = np.arange(smpl_trans.shape[0])  # Frame indices
             samples = smpl_trans[:, axis_idx]  # Values for this axis
             # Add keyframes
@@ -269,18 +267,32 @@ def add_animation(
             )
             fcurve.update()
 
-    output_path = f"{output_folder}/{Path(pkl_name).stem}.fbx"
-    bpy.ops.export_scene.fbx(filepath=output_path)
-    print(f"Exported FBX to {output_path}")
+    if z_up:
+        print("Rotating to be Y up.")
+        bpy.context.object.delta_rotation_euler[0] = -1.5708
+    if fix_edge_offset:
+        bpy.context.object.delta_location[2] = -1
+
+    output_path = f"{output_folder}/{Path(pkl_name).stem}.glb"
+    bpy.ops.export_scene.gltf(filepath=output_path)
+    print(f"Exported GLTF to {output_path}")
 
 
 if __name__ == "__main__":
     parser = ArgumentParserForBlender()
     parser.add_argument("--input_pkl_base", type=str, required=True)
-    parser.add_argument("--fbx_source_path", type=str, required=True)
+    parser.add_argument(
+        "--fbx_source_path",
+        type=str,
+        required=True,
+        help="Path to the model avatar (FBX file).",
+    )
     parser.add_argument("--output_base", type=str, default=None)
     parser.add_argument("--fps", type=int, default=30)
-    parser.add_argument("--fix_offset", action="store_true")
+    parser.add_argument("--fix_edge_offset", action="store_true")
+    parser.add_argument(
+        "--z_up", action="store_true", help="Will rotate the animation to be Y up"
+    )
     args = parser.parse_args()
 
     output_folder = args.output_base if args.output_base else args.input_pkl_base
@@ -289,13 +301,14 @@ if __name__ == "__main__":
 
     for pkl_name, smpl_params in smpl_objects:
         try:
-            add_animation(
+            convert_animation(
                 pkl_name,
                 args.fbx_source_path,
                 smpl_params,
                 output_folder,
                 args.fps,
-                args.fix_offset,
+                args.fix_edge_offset,
+                args.z_up,
             )
         except Exception as e:
             print(f"Error processing {pkl_name}: {e}")
