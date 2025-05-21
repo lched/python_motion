@@ -188,25 +188,22 @@ def to_euler(x, order="zyx"):
 
 
 def convert_animation(
-    pkl_name, fbx_source_path, smpl_params, output_folder, fps, fix_edge_offset, z_up
+    pkl_name,
+    fbx_source_path,
+    smpl_params,
+    output_folder,
+    fps,
+    fix_edge_offset,
+    scale_trans,
 ):
     clear_scene()
 
-    if z_up:
-        bpy.ops.import_scene.fbx(
-            filepath=fbx_source_path,
-            use_custom_props=True,
-            use_custom_props_enum_as_string=True,
-            ignore_leaf_bones=True,
-            axis_up="Z",
-        )
-    else:
-        bpy.ops.import_scene.fbx(
-            filepath=fbx_source_path,
-            use_custom_props=True,
-            use_custom_props_enum_as_string=True,
-            ignore_leaf_bones=True,
-        )
+    bpy.ops.import_scene.fbx(
+        filepath=fbx_source_path,
+        use_custom_props=True,
+        use_custom_props_enum_as_string=True,
+        ignore_leaf_bones=True,
+    )
     bpy.context.scene.render.fps = fps
 
     armature = next(
@@ -251,7 +248,7 @@ def convert_animation(
     # Translation
     bone = armature.pose.bones.get(joints[0])
     if bone:
-        smpl_trans = smpl_params["smpl_trans"]
+        smpl_trans = smpl_params["smpl_trans"] * scale_trans
         for axis_idx, axis in enumerate(["x", "y", "z"]):
             data_path = f'pose.bones["{joints[0]}"].location'
             fcurve = armature.animation_data.action.fcurves.new(
@@ -267,9 +264,6 @@ def convert_animation(
             )
             fcurve.update()
 
-    if z_up:
-        print("Rotating to be Y up.")
-        bpy.context.object.delta_rotation_euler[0] = -1.5708
     if fix_edge_offset:
         bpy.context.object.delta_location[2] = -1
 
@@ -290,9 +284,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_base", type=str, default=None)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--fix_edge_offset", action="store_true")
-    parser.add_argument(
-        "--z_up", action="store_true", help="Will rotate the animation to be Y up"
-    )
+    parser.add_argument("--scale_trans", type=float, default=1.0)
     args = parser.parse_args()
 
     output_folder = args.output_base if args.output_base else args.input_pkl_base
@@ -308,7 +300,7 @@ if __name__ == "__main__":
                 output_folder,
                 args.fps,
                 args.fix_edge_offset,
-                args.z_up,
+                args.scale_trans,
             )
         except Exception as e:
             print(f"Error processing {pkl_name}: {e}")
