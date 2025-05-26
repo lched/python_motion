@@ -265,7 +265,7 @@ def convert_animation(
             fcurve.update()
 
     if fix_edge_offset:
-        bpy.context.object.delta_location[2] = -1
+        bpy.context.object.delta_location[2] = -0.9
 
     output_path = f"{output_folder}/{Path(pkl_name).stem}.glb"
     bpy.ops.export_scene.gltf(filepath=output_path)
@@ -285,6 +285,7 @@ if __name__ == "__main__":
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--fix_edge_offset", action="store_true")
     parser.add_argument("--scale_trans", type=float, default=1.0)
+    parser.add_argument("--edge", action="store_true")
     args = parser.parse_args()
 
     output_folder = args.output_base if args.output_base else args.input_pkl_base
@@ -292,6 +293,21 @@ if __name__ == "__main__":
     smpl_objects = SmplObjects(args.input_pkl_base)
 
     for pkl_name, smpl_params in smpl_objects:
+        if args.edge:
+            rotation = R.from_euler(
+                "xyz", np.array([-90, 0, 0]), degrees=True
+            )  # -90 degrees about the x axis
+            root_rotvec = smpl_params["smpl_poses"][:, :3]
+            root_rotvec = (rotation * R.from_rotvec(root_rotvec)).as_rotvec()
+            smpl_params["smpl_poses"][:, :3] = root_rotvec
+
+            # For the positions, swap Y and Z
+            smpl_trans_y_up = np.copy(smpl_params["smpl_trans"])
+            smpl_trans_y_up[..., 1] = smpl_params["smpl_trans"][..., 2]
+            smpl_trans_y_up[..., 2] = -smpl_params["smpl_trans"][
+                ..., 1
+            ]  # don't forget the minus!!!
+            smpl_params["smpl_trans"] = smpl_trans_y_up
         try:
             convert_animation(
                 pkl_name,
