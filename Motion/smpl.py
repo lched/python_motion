@@ -104,12 +104,15 @@ def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
 
     # to quaternion
     rots = quat.from_axis_angle(rots)
-    order = "yzx"
+    # order = "yzx"
+    order = "zyx"
 
     pos = offsets[None].repeat(len(rots), axis=0)
     positions = pos.copy()
     positions[:, 0] += trans * 100
-    rotations = np.degrees(quat.to_euler(rots, order=order))
+    rotations = quat.to_euler(rots, order=order)
+    rotations = np.unwrap(rotations, axis=0)  # Unwrap in radians
+    rotations = np.degrees(rotations)  # Convert back to degrees
 
     bvh_data = {
         "rotations": rotations,
@@ -127,7 +130,7 @@ def bvh_data_to_smpl(bvh_data):
     # First, make sure the bvh_data is in the same order as SMPL format expects
     # Create a mapping from the current names to the SMPL_JOINTS_NAMES
     name_to_index = {name: i for i, name in enumerate(bvh_data["names"])}
-    # smpl_to_index = {name: i for i, name in enumerate(SMPL_JOINTS_NAMES)}
+
     # Create a reordering index array
     reorder_index = [name_to_index[name] for name in SMPL_JOINTS_NAMES]
 
@@ -144,7 +147,7 @@ def bvh_data_to_smpl(bvh_data):
     rotations = rotations.reshape(rotations.shape[0], -1)
 
     # Extract root translation and scale it back
-    trans = positions[:, 0]  # - offsets[0][None]
+    trans = positions[:, 0] - bvh_data["offsets"][0][None]
 
     # Prepare SMPL dictionary
     smpl_dict = {

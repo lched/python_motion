@@ -344,24 +344,25 @@ def to_axis_angle(quaternion):
     angle = 2 * np.arctan2(np.linalg.norm(xyz, axis=-1), w)
 
     # Normalize the angle to the range [-π, π]
-    angle = (angle + np.pi) % (2 * np.pi) - np.pi
+    # angle = (angle + np.pi) % (2 * np.pi) - np.pi
 
-    # Constrain the angle to [-π/2, π/2] by flipping the axis if necessary
-    mask = angle > np.pi / 2
-    xyz[mask] *= -1
-    angle[mask] -= np.pi
+    # # Constrain the angle to [-π/2, π/2] by flipping the axis if necessary
+    # mask = angle > np.pi / 2
+    # xyz[mask] *= -1
+    # angle[mask] -= np.pi
 
-    mask = angle < -np.pi / 2
-    xyz[mask] *= -1
-    angle[mask] += np.pi
+    # mask = angle < -np.pi / 2
+    # xyz[mask] *= -1
+    # angle[mask] += np.pi
 
-    # Compute the axis
+    # Compute the axis safely
     sin_half_angle = np.linalg.norm(xyz, axis=-1)
-    axis = np.where(
-        sin_half_angle[..., None] > 1e-8,
-        xyz / sin_half_angle[..., None],
-        np.array([1.0, 0.0, 0.0]),  # Default axis for zero rotation
-    )
+
+    # Safe division with default axis [1, 0, 0] when sin_half_angle is near zero
+    axis = np.zeros_like(xyz)
+    mask = sin_half_angle > 1e-8
+    axis[mask] = xyz[mask] / sin_half_angle[mask, None]
+    axis[~mask] = np.array([1.0, 0.0, 0.0])  # Default axis
 
     # Return axis-angle representation
     return axis * angle[..., None]
@@ -382,13 +383,22 @@ def from_angle_axis(angle, axis):
 
 # Calculate quaternions from axis-angle.
 def from_axis_angle(rots):
+    """Convert axis-angle representation to quaternion (scalar-first convention).
+
+    Args:
+        rots: Array-like with last dimension of size 3 (axis * angle)
+
+    Returns:
+        quaternion: Array with same shape as input except last dimension is 4 (w, x, y, z)
+    """
     angle = np.linalg.norm(rots, axis=-1)
-    # Prevent division by zero
-    axis = np.where(
-        angle[..., None] > 0,
-        rots / angle[..., None],
-        np.array([1.0, 0.0, 0.0]),  # default axis when angle == 0
-    )
+
+    # Compute axis safely without division warnings
+    axis = np.zeros_like(rots)
+    mask = angle > 0
+    axis[mask] = rots[mask] / angle[mask, None]
+    axis[~mask] = np.array([1.0, 0.0, 0.0])  # default axis when angle == 0
+
     return from_angle_axis(angle, axis)
 
 
