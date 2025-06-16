@@ -204,6 +204,7 @@ def convert_animation(
         use_custom_props_enum_as_string=True,
         ignore_leaf_bones=True,
     )
+    bpy.data.shape_keys["Key"].key_blocks["Shape001"].value = 1
     bpy.context.scene.render.fps = fps
 
     armature = next(

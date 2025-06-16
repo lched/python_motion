@@ -39,6 +39,7 @@ def load(filename: str, order: str = None) -> dict:
     i = 0
     active = -1
     end_site = False
+    end_sites = []
 
     # Create empty lists for saving parameters
     names = []
@@ -74,8 +75,11 @@ def load(filename: str, order: str = None) -> dict:
             r"\s*OFFSET\s+([\-\d\.e]+)\s+([\-\d\.e]+)\s+([\-\d\.e]+)", line
         )
         if offmatch:
+            offset = np.array(list(map(float, offmatch.groups())))
             if not end_site:
                 offsets[active] = np.array([list(map(float, offmatch.groups()))])
+            else:
+                end_sites.append((active, offset))
             continue
 
         chanmatch = re.match(r"\s*CHANNELS\s+(\d+)", line)
@@ -146,6 +150,7 @@ def load(filename: str, order: str = None) -> dict:
         "names": names,
         "order": order,
         "frametime": frametime,
+        "end_sites": end_sites,
     }
 
 
@@ -182,27 +187,32 @@ def save_joint(f, data, t, i, save_order, order="zyx", save_positions=False):
             )
         )
 
-    end_site = True
+    has_children = False
 
     for j in range(len(data["parents"])):
         if data["parents"][j] == i:
+            has_children = True
             t = save_joint(
                 f, data, t, j, save_order, order=order, save_positions=save_positions
             )
-            end_site = False
 
-    if end_site:
-        f.write("%sEnd Site\n" % t)
-        f.write("%s{\n" % t)
-        t += "\t"
-        f.write("%sOFFSET %f %f %f\n" % (t, 0.0, 0.0, 0.0))
-        t = t[:-1]
-        f.write("%s}\n" % t)
+    # Write end site only if this joint has no children
+    if not has_children:
+        # Check if there's an end site offset for this joint
+        for (pid, offset) in data.get("end_sites", []):
+            if pid == i:
+                f.write("%sEnd Site\n" % t)
+                f.write("%s{\n" % t)
+                t += "\t"
+                f.write("%sOFFSET %f %f %f\n" % (t, offset[0], offset[1], offset[2]))
+                t = t[:-1]
+                f.write("%s}\n" % t)
 
     t = t[:-1]
     f.write("%s}\n" % t)
 
     return t
+
 
 
 def save(filename, data, save_positions=False):

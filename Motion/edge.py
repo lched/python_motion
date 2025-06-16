@@ -1,6 +1,7 @@
-""" This file contains methods related to the EDGE model https://github.com/Stanford-TML/EDGE
+"""This file contains methods related to the EDGE model https://github.com/Stanford-TML/EDGE
 In its current implementation (21/05/25) EDGE takes as inputs motion data in the SMPL Y-up format (which we refer to as smpl) but outputs Z-up SMPL data (which we refer to as edge).
 """
+
 import copy
 
 import numpy as np
