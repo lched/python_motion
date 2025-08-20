@@ -92,6 +92,83 @@ SMPL_PARENTS = [
     21,
 ]
 
+LISN_JOINTS_NAMES = [
+    "Hips",  # 0
+    "Spine",  # 1
+    "Spine1",  # 2
+    "Neck",  # 3
+    "Head",  # 4
+    "LeftShoulder",  # 5
+    "LeftArm",  # 6
+    "LeftForeArm",  # 7
+    "LeftHand",  # 8
+    "RightShoulder",  # 9
+    "RightArm",  # 10
+    "RightForeArm",  # 11
+    "RightHand",  # 12
+    "LeftUpLeg",  # 13
+    "LeftLeg",  # 14
+    "LeftFoot",  # 15
+    "LeftToeBase",  # 16
+    "RightUpLeg",  # 17
+    "RightLeg",  # 18
+    "RightFoot",  # 19
+    "RightToeBase",  # 20
+]
+
+LISN_OFFSETS = [
+    [0.0, 0.0, 0.0],
+    [0.0, 0.070852, 0.0],
+    [0.0, 0.152636, 0.0],
+    [0.0, 0.169916, 0.0],
+    [0.0, 0.133927, 0.017281],
+    [0.0, 0.17281, 0.0],
+    [0.034198, 0.131853, -0.003205],
+    [0.115879, 0.0, 0.0],
+    [0.252722, 0.0, 0.0],
+    [0.231372, 0.0, 0.0],
+    [0.129607, 0.0, 0.0],
+    [-0.03481, 0.131853, -0.003205],
+    [-0.115879, 0.0, 0.0],
+    [-0.252722, 0.0, 0.0],
+    [-0.231372, 0.0, 0.0],
+    [-0.129607, 0.0, 0.0],
+    [0.086405, 0.0, 0.0],
+    [0.0, -0.403038, 0.0],
+    [0.0, -0.374775, 0.0],
+    [0.0, -0.056163, 0.129607],
+    [0.0, 0.0, 0.034562],
+    [-0.086405, 0.0, 0.0],
+    [0.0, -0.403038, 0.0],
+    [0.0, -0.374775, 0.0],
+    [0.0, -0.056163, 0.129607],
+    [0.0, 0.0, 0.034562],
+]
+
+LISN_PARENTS = [
+    -1,  # 0
+    0,  # 1
+    1,  # 2
+    2,  # 3
+    3,  # 4
+    2,  # 5
+    6,  # 6
+    7,  # 7
+    8,  # 8
+    2,  # 9
+    11,  # 10
+    12,  # 11
+    13,  # 12
+    0,  # 13
+    16,  # 14
+    17,  # 15
+    18,  # 16
+    0,  # 17
+    21,  # 18
+    22,  # 19
+    23,  # 20
+]
+
 
 def load_smpl(smpl_file):
     """Open animation in the SMPL format contained in a pickle or numpy data file.
@@ -128,76 +205,105 @@ def load_smpl(smpl_file):
     return smpl_dict
 
 
-def smpl_to_bvh_data(smpl_dict, gender="NEUTRAL", frametime=1 / 60):
-    rest_pose = np.array(SMPL_OFFSETS)
+def smpl_to_bvh_data(smpl_dict, frametime=1 / 60, motion_format="smpl"):
+    """ Convert SMPL dict (axis-angle poses + root trans) into BVH-style dict. \
+        The motion channels should be in the order specified by FORMAT_JOINTS_NAMES \
+        specified at the top of this file.
 
-    root_offset = rest_pose[0]
-    offsets = rest_pose  # - rest_pose[parents]
-    offsets[0] = root_offset
-    offsets *= 100
+    Args:
+        smpl_dict (dict): Dict with motion data as rotations in axis-angle and translations in meters.
+        frametime (float, optional): In seconds. Defaults to 1/60.
+        motion_format (['smpl', 'lisn'], optional): Motion format to use (defines joints names and order). Defaults to "smpl".
 
-    if "smpl_scaling" in smpl_dict.keys():
-        scaling = smpl_dict["smpl_scaling"]
+    Returns:
+        bvh_data (dict): Motion data in the bvh format.
+    """
+    if motion_format == "smpl":
+        parents = SMPL_PARENTS
+        names = SMPL_JOINTS_NAMES
+        rest_pose = np.array(SMPL_OFFSETS)
+    elif motion_format == "lisn":
+        parents = LISN_PARENTS
+        names = LISN_JOINTS_NAMES
+        rest_pose = np.array(LISN_OFFSETS)
     else:
-        scaling = 100
+        raise ValueError("motion_format must be 'lisn' or 'smpl'.")
 
-    rots = smpl_dict["smpl_poses"]
-    rots = rots.reshape(rots.shape[0], -1, 3)  # (N, 24, 3)
-    trans = smpl_dict["smpl_trans"]  # (N, 3)
-    trans /= scaling
+    # Skeleton offsets
+    offsets = rest_pose.copy()
+    offsets[0] = rest_pose[0]  # root absolute
+    offsets *= 100  # cm convention (BVH often uses cm)
 
-    # to quaternion
-    rots = quat.from_axis_angle(rots)
-    # order = "yzx"
+    # Scaling
+    scaling = smpl_dict.get("smpl_scaling", 100)
+
+    rots = smpl_dict["smpl_poses"].reshape(-1, len(names), 3)  # (N, J, 3)
+    trans = smpl_dict["smpl_trans"] / scaling  # (N, 3) in meters
+
+    # Convert axis-angle → quaternion → Euler
+    quats = quat.from_axis_angle(rots)
     order = "zyx"
+    eulers = quat.to_euler(quats, order=order)  # radians
+    eulers = np.unwrap(eulers, axis=0)  # temporal continuity
+    eulers = np.degrees(eulers)  # BVH expects degrees
 
-    pos = offsets[None].repeat(len(rots), axis=0)
-    positions = pos.copy()
-    positions[:, 0] += trans * 100
-    rotations = quat.to_euler(rots, order=order)
-    rotations = np.unwrap(rotations, axis=0)  # Unwrap in radians
-    rotations = np.degrees(rotations)  # Convert back to degrees
+    # Root positions
+    positions = np.tile(offsets[None], (len(rots), 1, 1))
+    positions[:, 0] += trans * 100  # cm
 
     bvh_data = {
-        "rotations": rotations,
-        "positions": positions / 100,  # We want the results in meter convention
-        "offsets": offsets / 100,
-        "parents": SMPL_PARENTS,
-        "names": SMPL_JOINTS_NAMES,
+        "rotations": eulers,
+        "positions": positions / 100,  # back to meters
+        "offsets": offsets / 100,  # meters
+        "parents": parents,
+        "names": names,
         "order": order,
         "frametime": frametime,
     }
     return bvh_data
 
 
-def bvh_data_to_smpl(bvh_data):
+def bvh_data_to_smpl(bvh_data, motion_format="smpl"):
+    """Convert BVH dict back into SMPL-compatible dict.
+
+    Args:
+        bvh_data (dict): _description_
+        motion_format (['smpl', 'lisn'], optional): Motion format to use (defines joints names and order). Defaults to "smpl".
+
+    Returns:
+        _type_: _description_
+    """
     # First, make sure the bvh_data is in the same order as SMPL format expects
     # Create a mapping from the current names to the SMPL_JOINTS_NAMES
     name_to_index = {name: i for i, name in enumerate(bvh_data["names"])}
+    if motion_format == "smpl":
+        joints_names = SMPL_JOINTS_NAMES
+    elif motion_format == "lisn":
+        joints_names = LISN_JOINTS_NAMES
+    else:
+        raise ValueError("motion_format must be 'lisn' or 'smpl'.")
+    reorder_index = [name_to_index[name] for name in joints_names]
 
-    # Create a reordering index array
-    reorder_index = [name_to_index[name] for name in SMPL_JOINTS_NAMES]
+    # Extract BVH data in SMPL order
+    rotations = bvh_data["rotations"][:, reorder_index, :]  # degrees
+    positions = bvh_data["positions"][:, reorder_index, :]  # meters
 
-    # Extract BVH data
-    rotations = bvh_data["rotations"][:, reorder_index, :]
-    positions = bvh_data["positions"][:, reorder_index, :]
-
-    # Convert rotations
+    # Convert Euler → quaternion → axis-angle
+    order = bvh_data["order"]
     rotations = np.radians(rotations)
-    rotations = quat.from_euler(rotations, order=bvh_data["order"])
-    rotations = quat.to_axis_angle(rotations)
+    quats = quat.from_euler(rotations, order=order)
+    axis_angles = quat.to_axis_angle(quats)  # (N, J, 3)
 
-    # Reshape rotations to match SMPL format
-    rotations = rotations.reshape(rotations.shape[0], -1)
+    # Extract root translation (meters → cm for SMPL convention)
+    trans = positions[:, 0] * 100
 
     # Extract root translation
     trans = positions[:, 0]
 
-    # Prepare SMPL dictionary
     smpl_dict = {
-        "smpl_poses": rotations,
-        "smpl_trans": trans * 100,
-        "smpl_scaling": np.array([100]),
+        "smpl_poses": smpl_poses,
+        "smpl_trans": trans,
+        "smpl_scaling": np.array([100]),  # cm convention
     }
 
     return smpl_dict

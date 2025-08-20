@@ -199,7 +199,7 @@ def save_joint(f, data, t, i, save_order, order="zyx", save_positions=False):
     # Write end site only if this joint has no children
     if not has_children:
         # Check if there's an end site offset for this joint
-        for (pid, offset) in data.get("end_sites", []):
+        for pid, offset in data.get("end_sites", []):
             if pid == i:
                 f.write("%sEnd Site\n" % t)
                 f.write("%s{\n" % t)
@@ -212,7 +212,6 @@ def save_joint(f, data, t, i, save_order, order="zyx", save_positions=False):
     f.write("%s}\n" % t)
 
     return t
-
 
 
 def save(filename, data, save_positions=False):
