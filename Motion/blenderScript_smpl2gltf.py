@@ -112,13 +112,22 @@ def from_angle_axis(angle, axis):
 
 # Calculate quaternions from axis-angle.
 def from_axis_angle(rots):
+    """Convert axis-angle representation to quaternion (scalar-first convention).
+
+    Args:
+        rots: Array-like with last dimension of size 3 (axis * angle)
+
+    Returns:
+        quaternion: Array with same shape as input except last dimension is 4 (w, x, y, z)
+    """
     angle = np.linalg.norm(rots, axis=-1)
-    # Prevent division by zero
-    axis = np.where(
-        angle[..., None] > 0,
-        rots / angle[..., None],
-        np.array([1.0, 0.0, 0.0]),  # default axis when angle == 0
-    )
+
+    # Compute axis safely without division warnings
+    axis = np.zeros_like(rots)
+    mask = angle > 0
+    axis[mask] = rots[mask] / angle[mask, None]
+    axis[~mask] = np.array([1.0, 0.0, 0.0])  # default axis when angle == 0
+
     return from_angle_axis(angle, axis)
 
 
@@ -246,19 +255,19 @@ def convert_animation(
             )
             fcurve.update()
 
-    # Translation
-    bone = armature.pose.bones.get(joints[0])
-    if bone:
-        smpl_trans = smpl_params["smpl_trans"] * scale_trans
+    smpl_trans_m = smpl_params["smpl_trans"] * scale_trans
+
+    # Translation -> Pelvis bone (root joint)
+    root_name = joints[0]  # "Pelvis"
+    root_bone = armature.pose.bones.get(root_name)
+    if root_bone:
         for axis_idx, axis in enumerate(["x", "y", "z"]):
-            data_path = f'pose.bones["{joints[0]}"].location'
+            data_path = f'pose.bones["{root_name}"].location'
             fcurve = armature.animation_data.action.fcurves.new(
                 data_path, index=axis_idx
             )
-
-            frames = np.arange(smpl_trans.shape[0])  # Frame indices
-            samples = smpl_trans[:, axis_idx]  # Values for this axis
-            # Add keyframes
+            frames = np.arange(smpl_trans_m.shape[0])
+            samples = smpl_trans_m[:, axis_idx]
             fcurve.keyframe_points.add(count=len(frames))
             fcurve.keyframe_points.foreach_set(
                 "co", [x for co in zip(frames, samples) for x in co]
@@ -266,7 +275,10 @@ def convert_animation(
             fcurve.update()
 
     if fix_edge_offset:
-        bpy.context.object.delta_location[2] = -0.9
+        bpy.context.object.delta_location[2] = -1
+    bpy.context.object.delta_location[
+        2
+    ] += 0.21  # Fix SMPL avatar's root bone vertical offset
 
     output_path = f"{output_folder}/{Path(pkl_name).stem}.glb"
     bpy.ops.export_scene.gltf(filepath=output_path)
