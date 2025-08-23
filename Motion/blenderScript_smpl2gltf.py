@@ -255,7 +255,9 @@ def convert_animation(
             )
             fcurve.update()
 
-    smpl_trans_m = smpl_params["smpl_trans"] * scale_trans
+    smpl_trans_m = (
+        smpl_params["smpl_trans"] - [-0.179506, -22.333345, 2.821913]
+    ) * scale_trans
 
     # Translation -> Pelvis bone (root joint)
     root_name = joints[0]  # "Pelvis"
@@ -276,9 +278,6 @@ def convert_animation(
 
     if fix_edge_offset:
         bpy.context.object.delta_location[2] = -1
-    bpy.context.object.delta_location[
-        2
-    ] += 0.21  # Fix SMPL avatar's root bone vertical offset
 
     output_path = f"{output_folder}/{Path(pkl_name).stem}.glb"
     bpy.ops.export_scene.gltf(filepath=output_path)
