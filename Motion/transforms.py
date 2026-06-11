@@ -261,9 +261,9 @@ def repr6d2mat(repr):
     x = repr[..., :3]
     y = repr[..., 3:]
     x = x / x.norm(dim=-1, keepdim=True)
-    z = torch.cross(x, y)
+    z = torch.cross(x, y, dim=-1)
     z = z / z.norm(dim=-1, keepdim=True)
-    y = torch.cross(z, x)
+    y = torch.cross(z, x, dim=-1)
     res = [x, y, z]
     res = [v.unsqueeze(-2) for v in res]
     mat = torch.cat(res, dim=-2)
@@ -274,9 +274,9 @@ def repr6d2quat(repr) -> torch.Tensor:
     x = repr[..., :3]
     y = repr[..., 3:]
     x = F.normalize(x, dim=-1)
-    z = torch.cross(x, y)
+    z = torch.cross(x, y, dim=-1)
     z = F.normalize(z, dim=-1)
-    y = torch.cross(z, x)
+    y = torch.cross(z, x, dim=-1)
     res = [x, y, z]
     res = [v.unsqueeze(-2) for v in res]
     mat = torch.cat(res, dim=-2)
